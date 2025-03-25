@@ -157,8 +157,6 @@ public class CodeGenerator extends Visitor<String>{
             statement.accept(this);
         }
         commands = "";
-        commands += "ret\n";
-//        commands += ".end method\n";
         addCommand(commands);
 
         return null;
@@ -179,15 +177,15 @@ public class CodeGenerator extends Visitor<String>{
 
         processExpression(funcCall.getValues().getFirst(), text);
 
-        addCommand("getstatic java/lang/System/out Ljava/io/PrintStream;");
-        addCommand("swap");
+//        addCommand("getstatic java/lang/System/out Ljava/io/PrintStream;");
+//        addCommand("swap");
 
         if (type.sameType(new IntType())) {
-            addCommand("invokevirtual java/io/PrintStream/println(I)V");
+//            addCommand("invokevirtual java/io/PrintStream/println(I)V");
         } else if (type.sameType(new BooleanType())) {
-            addCommand("invokevirtual java/io/PrintStream/println(Z)V");
+//            addCommand("invokevirtual java/io/PrintStream/println(Z)V");
         } else if (type.sameType(new StringType())) {
-            addCommand("invokevirtual java/io/PrintStream/println(Ljava/lang/String;)V");
+//            addCommand("invokevirtual java/io/PrintStream/println(Ljava/lang/String;)V");
         }
     }
 
@@ -200,7 +198,7 @@ public class CodeGenerator extends Visitor<String>{
             Type genericType = genericExpression.accept(expressionTypeEvaluator);
             addCommand(command);
             if (genericType.sameType(new BooleanType())) {
-                addCommand("invokevirtual java/lang/Boolean/booleanValue()Z");
+//                addCommand("invokevirtual java/lang/Boolean/booleanValue()Z");
             }
         }
     }
@@ -219,22 +217,23 @@ public class CodeGenerator extends Visitor<String>{
 
     private String getLoadCommand(VarDecSymbolTableItem varItem, boolean isArg) {
         String loadCommand = "";
-        int index = slotOf(varItem.getVarDec().getVarName());
+//        int index = slotOf(varItem.getVarDec().getVarName());
+        String variableName = varItem.getVarDec().getVarName();
 
 //        if (isArg) {
-            if (varItem.getVarDec().getType() instanceof IntType || varItem.getVarDec().getType().sameType(new BooleanType()))
-                loadCommand = "iload " + index;
-            else
-                loadCommand = "aload " + index;
+//            if (varItem.getVarDec().getType() instanceof IntType || varItem.getVarDec().getType().sameType(new BooleanType()))
+//                loadCommand = "iload " + index;
+//            else
+//                loadCommand = "aload " + index;
 //        }
 //        else {
 //            loadCommand = "aload " + index;
-//            if (varItem.getVarDec().getType().sameType(new IntType())) {
-//                loadCommand += "\ninvokevirtual java/lang/Integer/intValue()I";
+            if (varItem.getVarDec().getType().sameType(new IntType())) {
+                loadCommand += "\n%"+ variableName +" = alloca i32";
 //            } else if (varItem.getVarDec().getType().sameType(new BooleanType())) {
 //                loadCommand += "\ninvokevirtual java/lang/Boolean/booleanValue()Z";
 //            }
-//        }
+        }
         return loadCommand;
     }
 
@@ -248,7 +247,9 @@ public class CodeGenerator extends Visitor<String>{
 
     @Override
     public String visit(VarDec varDec) {
-        int index = slotOf(varDec.getVarName());
+        String variableName = varDec.getVarName();
+        String command = "\n%"+ variableName +" = alloca i32";
+        addCommand(command);
 
         return null;
     }
