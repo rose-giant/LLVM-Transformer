@@ -41,9 +41,9 @@ public class CodeGenerator extends Visitor<String>{
     }
 
     private void prepareOutputFolder(){
-        String jasminPath = "utilities/jarFiles/jasmin.jar";
-        String listClassPath = "utilities/codeGenerationUtilityClasses/List.j";
-        String fptrClassPath = "utilities/codeGenerationUtilityClasses/Fptr.j";
+//        String jasminPath = "utilities/jarFiles/jasmin.jar";
+//        String listClassPath = "utilities/codeGenerationUtilityClasses/List.j";
+//        String fptrClassPath = "utilities/codeGenerationUtilityClasses/Fptr.j";
         try{
             File directory = new File(this.outputPath);
             File[] files = directory.listFiles();
@@ -55,12 +55,12 @@ public class CodeGenerator extends Visitor<String>{
         catch(SecurityException e){
             // ignore
         }
-        copyFile(jasminPath, this.outputPath + "jasmin.jar");
-        copyFile(listClassPath, this.outputPath + "List.j");
-        copyFile(fptrClassPath, this.outputPath + "Fptr.j");
+//        copyFile(jasminPath, this.outputPath + "jasmin.jar");
+//        copyFile(listClassPath, this.outputPath + "List.j");
+//        copyFile(fptrClassPath, this.outputPath + "Fptr.j");
 
         try {
-            String path = outputPath + "Main.j";
+            String path = outputPath + "main.ll";
             File file = new File(path);
             file.createNewFile();
             mainFile = new FileWriter(path);
@@ -68,6 +68,7 @@ public class CodeGenerator extends Visitor<String>{
             // ignore
         }
     }
+
     private void addCommand(String command){
 //        System.out.println("suspicious command is " + command + " and " + isNull(command));
         try {
@@ -102,27 +103,17 @@ public class CodeGenerator extends Visitor<String>{
     }
 
     private void handleMainClass(){
-//        System.out.println("in main class handler!");
         String command = """
-                .method public static main([Ljava/lang/String;)V
-                .limit stack 128
-                .limit locals 128
-                new Main
-                invokespecial Main/<init>()V
-                return
-                .end method
+                define i32 @main() {
+                
+                    ret i32 0
+                }
                 """;
-//        System.out.println("commands are " + command + " and " + isNull(command));
         addCommand(command);
     }
 
     @Override
     public String visit(Program program) {
-        String commands = """
-                .class public Main
-                .super java/lang/Object
-                """;
-        addCommand(commands);
         handleMainClass();
 
         for (FuncDec funcDec : program.getFuncDecs()) {
@@ -156,18 +147,18 @@ public class CodeGenerator extends Visitor<String>{
         slots.clear();
         slotOf("MAIN");
         String commands = "";
-        commands += ".method public <init>()V\n";
-        commands += ".limit stack 128\n";
-        commands += ".limit locals 128\n";
-        commands += "aload 0\n";
-        commands += "invokespecial java/lang/Object/<init>()V\n";
+//        commands += ".method public <init>()V\n";
+//        commands += ".limit stack 128\n";
+//        commands += ".limit locals 128\n";
+//        commands += "aload 0\n";
+//        commands += "invokespecial java/lang/Object/<init>()V\n";
         addCommand(commands);
         for (var statement : main.getStmts()) {
             statement.accept(this);
         }
         commands = "";
-        commands += "return\n";
-        commands += ".end method\n";
+        commands += "ret\n";
+//        commands += ".end method\n";
         addCommand(commands);
 
         return null;

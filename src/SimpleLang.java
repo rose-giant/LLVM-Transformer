@@ -12,27 +12,27 @@ import java.io.*;
 
 public class SimpleLang {
     public static void main(String[] args) throws IOException {
-//        CharStream reader = CharStreams.fromFileName("cgSamples/sample.sl");
-//        SimpleLangLexer simpleLangLexer = new SimpleLangLexer(reader);
-//        CommonTokenStream tokens = new CommonTokenStream(simpleLangLexer);
-//        SimpleLangParser flParser = new SimpleLangParser(tokens);
-//        Program program = flParser.program().programRet;
+        CharStream reader = CharStreams.fromFileName("cgSamples/sample.sl");
+        SimpleLangLexer simpleLangLexer = new SimpleLangLexer(reader);
+        CommonTokenStream tokens = new CommonTokenStream(simpleLangLexer);
+        SimpleLangParser flParser = new SimpleLangParser(tokens);
+        Program program = flParser.program().programRet;
 //
-//        NameAnalyzer nameAnalyzer = new NameAnalyzer();
-//        nameAnalyzer.visit(program);
+        NameAnalyzer nameAnalyzer = new NameAnalyzer();
+        nameAnalyzer.visit(program);
 //
 //        TypeChecker typeChecker = new TypeChecker();
 //        typeChecker.visit(program);
 //
-//        CodeGenerator codeGenerator = new CodeGenerator();
-//        codeGenerator.visit(program);
+        CodeGenerator codeGenerator = new CodeGenerator();
+        codeGenerator.visit(program);
 
         runLLVMCode();
     }
 
     private static void runLLVMCode() {
         //test#2
-        ProcessBuilder pb = new ProcessBuilder("lli", "./codeGenOutput/main3.ll");
+        ProcessBuilder pb = new ProcessBuilder("lli", "./codeGenOutput/main.ll");
         pb.inheritIO();
         try {
             Process p = pb.start();
