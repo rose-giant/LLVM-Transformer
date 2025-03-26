@@ -10,7 +10,6 @@ public class UnaryExpr extends Expr{
         this.operand = operand;
     }
 
-
     @Override
     public <T> T accept(IVisitor<T> visitor) {
         return visitor.visit(this);
@@ -18,9 +17,5 @@ public class UnaryExpr extends Expr{
 
     public Value getOperand() {
         return operand;
-    }
-
-    public void setOperand(Value operand) {
-        this.operand = operand;
     }
 }

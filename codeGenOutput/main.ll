@@ -1,8 +1,9 @@
 		define i32 @main() {
 		
-		    ret i32 0
-		}
-		
 		
 		%a = alloca i32
 		
+		store i32 123, i32* %a
+		
+		ret i32 0
+		}

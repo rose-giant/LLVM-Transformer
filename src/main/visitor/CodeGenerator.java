@@ -16,8 +16,6 @@ import main.ast.nodes.value.primitiveVals.BooleanValue;
 import main.ast.nodes.value.primitiveVals.IntValue;
 import main.ast.nodes.value.primitiveVals.StringValue;
 import main.symbolTable.SymbolTable;
-import main.symbolTable.exceptions.ItemAlreadyExists;
-import main.symbolTable.exceptions.ItemNotFound;
 import main.symbolTable.exceptions.ItemNotFoundException;
 import main.symbolTable.item.VarDecSymbolTableItem;
 
@@ -25,11 +23,9 @@ import java.io.*;
 import java.util.HashMap;
 import java.util.Objects;
 
-import static java.util.Objects.isNull;
-
 public class CodeGenerator extends Visitor<String>{
     private SymbolTable currentSymbolTable;
-    private ExpressionTypeEvaluator expressionTypeEvaluator = new ExpressionTypeEvaluator();
+    private final ExpressionTypeEvaluator expressionTypeEvaluator = new ExpressionTypeEvaluator();
     private final HashMap<String, Integer> slots = new HashMap<>();
 
     private final String outputPath;
@@ -41,9 +37,6 @@ public class CodeGenerator extends Visitor<String>{
     }
 
     private void prepareOutputFolder(){
-//        String jasminPath = "utilities/jarFiles/jasmin.jar";
-//        String listClassPath = "utilities/codeGenerationUtilityClasses/List.j";
-//        String fptrClassPath = "utilities/codeGenerationUtilityClasses/Fptr.j";
         try{
             File directory = new File(this.outputPath);
             File[] files = directory.listFiles();
@@ -55,9 +48,6 @@ public class CodeGenerator extends Visitor<String>{
         catch(SecurityException e){
             // ignore
         }
-//        copyFile(jasminPath, this.outputPath + "jasmin.jar");
-//        copyFile(listClassPath, this.outputPath + "List.j");
-//        copyFile(fptrClassPath, this.outputPath + "Fptr.j");
 
         try {
             String path = outputPath + "main.ll";
@@ -85,30 +75,36 @@ public class CodeGenerator extends Visitor<String>{
         }
     }
 
-    private void copyFile(String toBeCopied, String toBePasted){
-        try {
-            File readingFile = new File(toBeCopied);
-            File writingFile = new File(toBePasted);
-            InputStream readingFileStream = new FileInputStream(readingFile);
-            OutputStream writingFileStream = new FileOutputStream(writingFile);
-            byte[] buffer = new byte[1024];
-            int readLength;
-            while ((readLength = readingFileStream.read(buffer)) > 0)
-                writingFileStream.write(buffer, 0, readLength);
-            readingFileStream.close();
-            writingFileStream.close();
-        } catch (IOException e){
-            // ignore
-        }
-    }
+//    private void copyFile(String toBeCopied, String toBePasted){
+//        try {
+//            File readingFile = new File(toBeCopied);
+//            File writingFile = new File(toBePasted);
+//            InputStream readingFileStream = new FileInputStream(readingFile);
+//            OutputStream writingFileStream = new FileOutputStream(writingFile);
+//            byte[] buffer = new byte[1024];
+//            int readLength;
+//            while ((readLength = readingFileStream.read(buffer)) > 0)
+//                writingFileStream.write(buffer, 0, readLength);
+//            readingFileStream.close();
+//            writingFileStream.close();
+//        } catch (IOException e){
+//            // ignore
+//        }
+//    }
 
     private void handleMainClass(){
         String command = """
                 define i32 @main() {
                 
-                    ret i32 0
-                }
                 """;
+        addCommand(command);
+    }
+
+    private void finishMainClass() {
+        String command = """
+            ret i32 0
+            }
+            """;
         addCommand(command);
     }
 
@@ -126,6 +122,7 @@ public class CodeGenerator extends Visitor<String>{
             program.getMain().accept(this);
         }
 
+        finishMainClass();
         return null;
     }
 
@@ -147,11 +144,6 @@ public class CodeGenerator extends Visitor<String>{
         slots.clear();
         slotOf("MAIN");
         String commands = "";
-//        commands += ".method public <init>()V\n";
-//        commands += ".limit stack 128\n";
-//        commands += ".limit locals 128\n";
-//        commands += "aload 0\n";
-//        commands += "invokespecial java/lang/Object/<init>()V\n";
         addCommand(commands);
         for (var statement : main.getStmts()) {
             statement.accept(this);
@@ -177,9 +169,6 @@ public class CodeGenerator extends Visitor<String>{
 
         processExpression(funcCall.getValues().getFirst(), text);
 
-//        addCommand("getstatic java/lang/System/out Ljava/io/PrintStream;");
-//        addCommand("swap");
-
         if (type.sameType(new IntType())) {
 //            addCommand("invokevirtual java/io/PrintStream/println(I)V");
         } else if (type.sameType(new BooleanType())) {
@@ -191,9 +180,9 @@ public class CodeGenerator extends Visitor<String>{
 
     private <T extends Expr> void processExpression(T genericExpression, String command) {
         if (genericExpression instanceof Identifier identifier) {
-            addCommand(getLoadCommand(Objects.requireNonNull(getItemFromName(identifier.getName())), false));
+            addCommand(getLoadCommand(Objects.requireNonNull(getItemFromName(identifier.getName()))));
         } else if (genericExpression instanceof UnaryExpr unaryExpr && unaryExpr.getOperand() instanceof Identifier identifier) {
-            addCommand(getLoadCommand(Objects.requireNonNull(getItemFromName(identifier.getName())), false));
+            addCommand(getLoadCommand(Objects.requireNonNull(getItemFromName(identifier.getName()))));
         } else {
             Type genericType = genericExpression.accept(expressionTypeEvaluator);
             addCommand(command);
@@ -215,7 +204,7 @@ public class CodeGenerator extends Visitor<String>{
         return null;
     }
 
-    private String getLoadCommand(VarDecSymbolTableItem varItem, boolean isArg) {
+    private String getLoadCommand(VarDecSymbolTableItem varItem) {
         String loadCommand = "";
 //        int index = slotOf(varItem.getVarDec().getVarName());
         String variableName = varItem.getVarDec().getVarName();
@@ -254,26 +243,49 @@ public class CodeGenerator extends Visitor<String>{
         return null;
     }
 
+    private Object getExprssionValue(Expr expression) {
+
+        if (expression instanceof UnaryExpr) {
+            return getUnaryExpressionValue( (UnaryExpr) expression);
+        }
+
+        return null;
+    }
+
+    private Object getUnaryExpressionValue(UnaryExpr unaryExpr) {
+        Object operand = unaryExpr.getOperand();
+        if (operand instanceof IntValue)
+            return ((IntValue) operand).getIntVal() + "";
+        if (operand instanceof StringValue)
+            return ((StringValue) operand).getStr();
+
+        return null;
+    }
+
     @Override
     public String visit(Assign assign) {
         if ( assign.getRightHand() != null ) {
             assign.getRightHand().accept(this);
         }
 
-        int index = slotOf(assign.getLeftHand());
         String assignExprByteCode = assign.getRightHand().accept(this);
-        String jasminCode;
+        String command = "";
         processExpression(assign.getRightHand(), assignExprByteCode);
 
+        Object rightHandValue = getExprssionValue(assign.getRightHand());
         VarDecSymbolTableItem leftHand = getItemFromName(assign.getLeftHand());
+        assert leftHand != null;
+        String variableName = leftHand.getVarDec().getVarName();
 
-        if (leftHand.getVarDec().getType().sameType(new IntType()) || leftHand.getVarDec().getType().sameType(new BooleanType())) {
-            jasminCode = "istore " + index;
-        } else {
-            jasminCode = "astore " + index;
+        if (leftHand.getVarDec().getType().sameType(new IntType())) {
+            command = "store i32 "+ rightHandValue +", i32* %" + variableName;
         }
-
-        addCommand(jasminCode);
+//        if (leftHand.getVarDec().getType().sameType(new IntType()) || leftHand.getVarDec().getType().sameType(new BooleanType())) {
+//            command = "istore " + index;
+//        } else {
+//            command = "astore " + index;
+//        }
+        addCommand(command);
 
         return null;
     }
@@ -286,7 +298,6 @@ public class CodeGenerator extends Visitor<String>{
 
         return null;
     }
-
 
     @Override
     public String visit(UnaryExpr unaryExpr) {
@@ -309,7 +320,7 @@ public class CodeGenerator extends Visitor<String>{
 
     @Override
     public String visit(IntValue intValue) {
-        return "ldc " + intValue.getIntVal();
+        return "";
     }
 
     @Override
