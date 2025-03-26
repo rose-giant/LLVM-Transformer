@@ -20,8 +20,12 @@ import main.symbolTable.exceptions.ItemNotFoundException;
 import main.symbolTable.item.VarDecSymbolTableItem;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class CodeGenerator extends Visitor<String>{
     private SymbolTable currentSymbolTable;
@@ -29,6 +33,7 @@ public class CodeGenerator extends Visitor<String>{
     private final HashMap<String, Integer> slots = new HashMap<>();
 
     private final String outputPath;
+    private String currentCommand = "";
 
     private FileWriter mainFile;
     public CodeGenerator() {
@@ -59,38 +64,30 @@ public class CodeGenerator extends Visitor<String>{
         }
     }
 
-    private void addCommand(String command){
-//        System.out.println("suspicious command is " + command + " and " + isNull(command));
+    private void writeCommandsToOutputFile() {
         try {
-            command = String.join("\n\t\t", command.split("\n"));
-            if(command.startsWith("Label_"))
-                mainFile.write("\t" + command + "\n");
-            else if(command.startsWith("."))
-                mainFile.write(command + "\n");
+            currentCommand = String.join("\n\t\t", currentCommand.split("\n"));
+            if(currentCommand.startsWith("Label_"))
+                mainFile.write("\t" + currentCommand + "\n");
+            else if(currentCommand.startsWith("."))
+                mainFile.write(currentCommand + "\n");
             else
-                mainFile.write("\t\t" + command + "\n");
+                mainFile.write("\t\t" + currentCommand + "\n");
             mainFile.flush();
         } catch (IOException e){
             // ignore
         }
     }
 
-//    private void copyFile(String toBeCopied, String toBePasted){
-//        try {
-//            File readingFile = new File(toBeCopied);
-//            File writingFile = new File(toBePasted);
-//            InputStream readingFileStream = new FileInputStream(readingFile);
-//            OutputStream writingFileStream = new FileOutputStream(writingFile);
-//            byte[] buffer = new byte[1024];
-//            int readLength;
-//            while ((readLength = readingFileStream.read(buffer)) > 0)
-//                writingFileStream.write(buffer, 0, readLength);
-//            readingFileStream.close();
-//            writingFileStream.close();
-//        } catch (IOException e){
-//            // ignore
-//        }
-//    }
+    private void addCommand(String command){
+        currentCommand = currentCommand.concat(command);
+    }
+
+    private void addCommandAtBeginning(String command) {
+//        currentCommand = command + command;
+        String temp = command.concat(currentCommand);
+        currentCommand = temp;
+    }
 
     private void handleMainClass(){
         String command = """
@@ -123,6 +120,8 @@ public class CodeGenerator extends Visitor<String>{
         }
 
         finishMainClass();
+        writeCommandsToOutputFile();
+
         return null;
     }
 
@@ -141,14 +140,14 @@ public class CodeGenerator extends Visitor<String>{
     public String visit(Main main) {
         currentSymbolTable = main.getMainSymbolTable();
 
-        slots.clear();
+//        slots.clear();
         String commands = "";
-        addCommand(commands);
+//        addCommand(commands);
         for (var statement : main.getStmts()) {
             statement.accept(this);
         }
-        commands = "";
-        addCommand(commands);
+//        commands = "";
+//        addCommand(commands);
 
         return null;
     }
@@ -160,20 +159,36 @@ public class CodeGenerator extends Visitor<String>{
         return null;
     }
 
+    private int tempVriableCounter = -1;
+    private String getNewTempVar() {
+        tempVriableCounter ++;
+        String varName = "val";
+        return varName + tempVriableCounter;
+    }
+
     private void handlePrint(FuncCall funcCall) {
         String text = funcCall.getValues().getFirst().accept(this);
 
         expressionTypeEvaluator.setCurrentSymbolTable(currentSymbolTable);
         Type type = funcCall.getValues().getFirst().accept(expressionTypeEvaluator);
-
         processExpression(funcCall.getValues().getFirst(), text);
+        String command = "";
 
         if (type.sameType(new IntType())) {
-//            addCommand("invokevirtual java/io/PrintStream/println(I)V");
+            addCommandAtBeginning("""
+                    \n@.fmt = private constant [4 x i8] c"%d\\0A\\00"
+                    declare i32 @printf(i8*, ...)\n""");
+            String temVarName = getNewTempVar();
+            command = "\n%"+ temVarName +" = load i32, i32* %" + text +
+                    "\ncall i32 (i8*, ...) @printf(i8* getelementptr ([3 x i8], [3 x i8]* @.fmt, i32 0, i32 0), i32 %"+ temVarName +")";
+            addCommand(command);
+
         } else if (type.sameType(new BooleanType())) {
 //            addCommand("invokevirtual java/io/PrintStream/println(Z)V");
         } else if (type.sameType(new StringType())) {
-//            addCommand("invokevirtual java/io/PrintStream/println(Ljava/lang/String;)V");
+            addCommand("@.fmt = private constant [" +
+                    text.length() + 1 +" x i8] c\"%d\\00\" \n" +
+                    "declare i32 @printf(i8*, ...)");
         }
     }
 
@@ -281,7 +296,7 @@ public class CodeGenerator extends Visitor<String>{
         String variableName = leftHand.getVarDec().getVarName();
 
         if (leftHand.getVarDec().getType().sameType(new IntType())) {
-            command = "store i32 "+ rightHandValue +", i32* %" + variableName;
+            command = "\nstore i32 "+ rightHandValue +", i32* %" + variableName;
         }
 //        if (leftHand.getVarDec().getType().sameType(new IntType()) || leftHand.getVarDec().getType().sameType(new BooleanType())) {
 //            command = "istore " + index;
@@ -318,7 +333,7 @@ public class CodeGenerator extends Visitor<String>{
 
     @Override
     public String visit(StringValue stringValue) {
-        return "ldc " + stringValue.getStr();
+        return "";
     }
 
     @Override
@@ -328,7 +343,7 @@ public class CodeGenerator extends Visitor<String>{
 
     @Override
     public String visit(BooleanValue booleanValue) {
-        return "ldc " + booleanValue.getBool();
+        return "";
     }
 
     @Override

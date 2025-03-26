@@ -30,7 +30,7 @@ public class SimpleLang {
         runLLVMCode();
     }
 
-    private static void runLLVMCode() {
+    public static void runLLVMCode() {
         //test#2
         ProcessBuilder pb = new ProcessBuilder("lli", "./codeGenOutput/main.ll");
         pb.inheritIO();
