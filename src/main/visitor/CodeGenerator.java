@@ -20,12 +20,8 @@ import main.symbolTable.exceptions.ItemNotFoundException;
 import main.symbolTable.item.VarDecSymbolTableItem;
 
 import java.io.*;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Objects;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class CodeGenerator extends Visitor<String>{
     private SymbolTable currentSymbolTable;
@@ -99,7 +95,7 @@ public class CodeGenerator extends Visitor<String>{
 
     private void finishMainClass() {
         String command = """
-            ret i32 0
+            \nret i32 0
             }
             """;
         addCommand(command);
@@ -139,16 +135,10 @@ public class CodeGenerator extends Visitor<String>{
     @Override
     public String visit(Main main) {
         currentSymbolTable = main.getMainSymbolTable();
-
-//        slots.clear();
         String commands = "";
-//        addCommand(commands);
         for (var statement : main.getStmts()) {
             statement.accept(this);
         }
-//        commands = "";
-//        addCommand(commands);
-
         return null;
     }
 
@@ -159,11 +149,18 @@ public class CodeGenerator extends Visitor<String>{
         return null;
     }
 
-    private int tempVriableCounter = -1;
+    private int tempVariableCounter = -1;
     private String getNewTempVar() {
-        tempVriableCounter ++;
+        tempVariableCounter++;
         String varName = "val";
-        return varName + tempVriableCounter;
+        return varName + tempVariableCounter;
+    }
+
+    private int printCounter = -1;
+    private String getNewPrintName() {
+        printCounter ++;
+        String varName = "fmt_ptr";
+        return varName + printCounter;
     }
 
     private void handlePrint(FuncCall funcCall) {
@@ -179,8 +176,10 @@ public class CodeGenerator extends Visitor<String>{
                     \n@.fmt = private constant [4 x i8] c"%d\\0A\\00"
                     declare i32 @printf(i8*, ...)\n""");
             String temVarName = getNewTempVar();
+            String fmtPointerName = getNewPrintName();
             command = "\n%"+ temVarName +" = load i32, i32* %" + text +
-                    "\ncall i32 (i8*, ...) @printf(i8* getelementptr ([3 x i8], [3 x i8]* @.fmt, i32 0, i32 0), i32 %"+ temVarName +")";
+                    "\n%" + fmtPointerName + " = getelementptr [4 x i8], [4 x i8]* @.fmt, i32 0, i32 0" +
+                    "\ncall i32 (i8*, ...) @printf(i8* %"+ fmtPointerName +", i32 %"+ temVarName +")";
             addCommand(command);
 
         } else if (type.sameType(new BooleanType())) {
@@ -221,7 +220,7 @@ public class CodeGenerator extends Visitor<String>{
     private String getLoadCommand(VarDecSymbolTableItem varItem) {
         String loadCommand = "";
 //        int index = slotOf(varItem.getVarDec().getVarName());
-        String variableName = varItem.getVarDec().getVarName();
+//        String variableName = varItem.getVarDec().getVarName();
 
 //        if (isArg) {
 //            if (varItem.getVarDec().getType() instanceof IntType || varItem.getVarDec().getType().sameType(new BooleanType()))
@@ -231,12 +230,12 @@ public class CodeGenerator extends Visitor<String>{
 //        }
 //        else {
 //            loadCommand = "aload " + index;
-            if (varItem.getVarDec().getType().sameType(new IntType())) {
-                loadCommand += "\n%"+ variableName +" = alloca i32";
+//            if (varItem.getVarDec().getType().sameType(new IntType())) {
+//                loadCommand += "\n%"+ variableName +" = alloca i32";
 //            } else if (varItem.getVarDec().getType().sameType(new BooleanType())) {
 //                loadCommand += "\ninvokevirtual java/lang/Boolean/booleanValue()Z";
 //            }
-        }
+//        }
         return loadCommand;
     }
 

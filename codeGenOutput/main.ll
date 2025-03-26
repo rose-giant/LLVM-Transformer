@@ -5,8 +5,9 @@
 		
 		
 		%a = alloca i32
-		store i32 123, i32* %a
-		%a = alloca i32
+		store i32 90, i32* %a
 		%val0 = load i32, i32* %a
-		call i32 (i8*, ...) @printf(i8* getelementptr ([3 x i8], [3 x i8]* @.fmt, i32 0, i32 0), i32 %val0)ret i32 0
+		%fmt_ptr0 = getelementptr [4 x i8], [4 x i8]* @.fmt, i32 0, i32 0
+		call i32 (i8*, ...) @printf(i8* %fmt_ptr0, i32 %val0)
+		ret i32 0
 		}
