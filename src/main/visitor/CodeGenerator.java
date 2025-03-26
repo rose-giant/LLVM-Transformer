@@ -142,7 +142,6 @@ public class CodeGenerator extends Visitor<String>{
         currentSymbolTable = main.getMainSymbolTable();
 
         slots.clear();
-        slotOf("MAIN");
         String commands = "";
         addCommand(commands);
         for (var statement : main.getStmts()) {
@@ -226,20 +225,24 @@ public class CodeGenerator extends Visitor<String>{
         return loadCommand;
     }
 
-    private int slotOf(String var) {
-        if (!slots.containsKey(var)) {
-            slots.put(var, slots.size());
-            return slots.size() - 1;
-        }
-        return slots.get(var);
-    }
-
     @Override
     public String visit(VarDec varDec) {
         String variableName = varDec.getVarName();
-        String command = "\n%"+ variableName +" = alloca i32";
-        addCommand(command);
+        String command = "\n%"+ variableName +" = alloca ";
 
+        if (varDec.getType() instanceof IntType) {
+            command = command + "i32";
+        }
+
+        if (varDec.getType() instanceof BooleanType) {
+            command = command + "i1";
+        }
+
+        if (varDec.getType() instanceof StringType) {
+            command = command + "i8*";
+        }
+
+        addCommand(command);
         return null;
     }
 
