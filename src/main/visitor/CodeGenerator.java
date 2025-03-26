@@ -80,9 +80,7 @@ public class CodeGenerator extends Visitor<String>{
     }
 
     private void addCommandAtBeginning(String command) {
-//        currentCommand = command + command;
-        String temp = command.concat(currentCommand);
-        currentCommand = temp;
+        currentCommand = command.concat(currentCommand);
     }
 
     private void handleMainClass(){
@@ -135,7 +133,6 @@ public class CodeGenerator extends Visitor<String>{
     @Override
     public String visit(Main main) {
         currentSymbolTable = main.getMainSymbolTable();
-        String commands = "";
         for (var statement : main.getStmts()) {
             statement.accept(this);
         }
@@ -165,37 +162,56 @@ public class CodeGenerator extends Visitor<String>{
 
     private void handlePrint(FuncCall funcCall) {
         String text = funcCall.getValues().getFirst().accept(this);
-
         expressionTypeEvaluator.setCurrentSymbolTable(currentSymbolTable);
         Type type = funcCall.getValues().getFirst().accept(expressionTypeEvaluator);
         processExpression(funcCall.getValues().getFirst(), text);
-        String command = "";
 
-        if (type.sameType(new IntType())) {
-            addCommandAtBeginning("""
-                    \n@.fmt = private constant [4 x i8] c"%d\\0A\\00"
-                    declare i32 @printf(i8*, ...)\n""");
-            String temVarName = getNewTempVar();
-            String fmtPointerName = getNewPrintName();
-            command = "\n%"+ temVarName +" = load i32, i32* %" + text +
-                    "\n%" + fmtPointerName + " = getelementptr [4 x i8], [4 x i8]* @.fmt, i32 0, i32 0" +
-                    "\ncall i32 (i8*, ...) @printf(i8* %"+ fmtPointerName +", i32 %"+ temVarName +")";
-            addCommand(command);
+        boolean paramIsPrinted = currentSymbolTable.items.containsKey("VarDec_"+text);
 
-        } else if (type.sameType(new BooleanType())) {
-//            addCommand("invokevirtual java/io/PrintStream/println(Z)V");
-        } else if (type.sameType(new StringType())) {
-            addCommand("@.fmt = private constant [" +
-                    text.length() + 1 +" x i8] c\"%d\\00\" \n" +
-                    "declare i32 @printf(i8*, ...)");
+        if (paramIsPrinted) {
+            if (type.sameType(new IntType())) {
+                addCommandAtBeginning("""
+                \n@.fmt = private constant [4 x i8] c"%d\\0A\\00"
+                declare i32 @printf(i8*, ...)
+                """);
+
+                String temVarName = getNewTempVar();
+                String fmtPointerName = getNewPrintName();
+
+                addCommand("\n%"+ temVarName +" = load i32, i32* %" + text +
+                        "\n%" + fmtPointerName + " = getelementptr [4 x i8], [4 x i8]* @.fmt, i32 0, i32 0" +
+                        "\ncall i32 (i8*, ...) @printf(i8* %"+ fmtPointerName +", i32 %"+ temVarName +")");
+
+            } else if (type.sameType(new BooleanType())) {
+
+            } else if (type.sameType(new StringType())) {
+                addCommand("@.fmt = private constant [" +
+                        text.length() + 1 +" x i8] c\"%d\\00\" \n" +
+                        "declare i32 @printf(i8*, ...)");
+            }
+        } else {
+            UnaryExpr unaryExpr = (UnaryExpr) funcCall.getValues().getFirst();
+            String argValue = unaryExpr.getOperand().toString();
+            if (type instanceof IntType) {
+                addCommandAtBeginning("""
+                \n@.fmt = private constant [4 x i8] c"%d\\0A\\00"
+                declare i32 @printf(i8*, ...)
+                """);
+
+                String fmtPointerName = getNewPrintName();
+
+                addCommand("%"+fmtPointerName + " = getelementptr [4 x i8], [4 x i8]* @.fmt, i32 0, i32 0" +
+                        "\ncall i32 (i8*, ...) @printf(i8* %"+ fmtPointerName +", i32 "+ argValue +")");
+            }
         }
+
     }
 
     private <T extends Expr> void processExpression(T genericExpression, String command) {
         if (genericExpression instanceof Identifier identifier) {
-            addCommand(getLoadCommand(Objects.requireNonNull(getItemFromName(identifier.getName()))));
-        } else if (genericExpression instanceof UnaryExpr unaryExpr && unaryExpr.getOperand() instanceof Identifier identifier) {
-            addCommand(getLoadCommand(Objects.requireNonNull(getItemFromName(identifier.getName()))));
+//            addCommand(getLoadCommand(Objects.requireNonNull(getItemFromName(identifier.getName()))));
+//        } else if (genericExpression instanceof UnaryExpr unaryExpr && unaryExpr.getOperand() instanceof Identifier identifier) {
+//            addCommand(getLoadCommand(Objects.requireNonNull(getItemFromName(identifier.getName()))));
         } else {
             Type genericType = genericExpression.accept(expressionTypeEvaluator);
             addCommand(command);
@@ -217,8 +233,8 @@ public class CodeGenerator extends Visitor<String>{
         return null;
     }
 
-    private String getLoadCommand(VarDecSymbolTableItem varItem) {
-        String loadCommand = "";
+//    private String getLoadCommand(VarDecSymbolTableItem varItem) {
+//        String loadCommand = "";
 //        int index = slotOf(varItem.getVarDec().getVarName());
 //        String variableName = varItem.getVarDec().getVarName();
 
@@ -236,8 +252,8 @@ public class CodeGenerator extends Visitor<String>{
 //                loadCommand += "\ninvokevirtual java/lang/Boolean/booleanValue()Z";
 //            }
 //        }
-        return loadCommand;
-    }
+//        return loadCommand;
+//    }
 
     @Override
     public String visit(VarDec varDec) {
