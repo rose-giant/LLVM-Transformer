@@ -91,6 +91,7 @@ public class CodeGenerator extends Visitor<String>{
         String command = """
                 @.fmt_int = private constant [4 x i8] c"%d\\0A\\00"  ; Format string for printing integers
                 declare i32 @printf(i8*, ...)
+                declare i32 @puts(i8*)
                 define i32 @main() {
                 """;
         addCommand(command);
@@ -199,7 +200,8 @@ public class CodeGenerator extends Visitor<String>{
                 addCommand("\n%"+temVarName+" = load i8*, i8** %"+ text);
                 addCommand("\ncall i32 (i8*, ...) @printf(i8* %"+temVarName+")");
             }
-        } else {
+        }
+        else {
             UnaryExpr unaryExpr = (UnaryExpr) funcCall.getValues().getFirst();
             String argValue = unaryExpr.getOperand().toString();
             String fmtPointerName = getNewPrintName();
@@ -208,6 +210,15 @@ public class CodeGenerator extends Visitor<String>{
                 addCommand("\n%"+fmtPointerName + " = getelementptr [4 x i8], [4 x i8]* @.fmt_int, i32 0, i32 0" +
                         "\ncall i32 (i8*, ...) @printf(i8* %"+ fmtPointerName +", i32 "+ argValue +")");
             } else if (type instanceof StringType) {
+                String strLiteral = removeExtraQuotations(argValue);
+                String strName = "str"+getStringCounter();
+                int strLen = strLiteral.length()+2;
+                String printPointerName = getNewPrintName();
+
+
+                addCommandAtBeginning("@."+ strName +" = private constant ["+ strLen +" x i8] c\""+strLiteral+"\\0A\\00\"\n");
+                addCommand("\n%"+printPointerName+" = getelementptr ["+strLen+" x i8], ["+strLen+" x i8]* @."+strName+", i32 0, i32 0\n" +
+                        "\ncall i32 @puts(i8* %"+printPointerName+")");
             }
         }
     }
@@ -280,6 +291,14 @@ public class CodeGenerator extends Visitor<String>{
             }
 
         return null;
+    }
+
+    private String removeExtraQuotations(String inputStr) {
+        if ( inputStr.startsWith("\"") && inputStr.endsWith("\"") ) {
+            return inputStr.substring(1, inputStr.length() - 1);
+        } else {
+            return inputStr;
+        }
     }
 
     @Override
