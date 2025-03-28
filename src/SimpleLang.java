@@ -1,7 +1,6 @@
 import main.ast.nodes.Program;
 import main.visitor.CodeGenerator;
 import main.visitor.NameAnalyzer;
-import main.visitor.TypeChecker;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;

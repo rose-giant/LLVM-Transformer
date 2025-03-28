@@ -89,11 +89,9 @@ public class CodeGenerator extends Visitor<String>{
 
     private void handleMainClass(){
         String command = """
-                @.fmt_str = private constant [4 x i8] c"%s\\0A\\00"  ; Format string for printing strings
                 @.fmt_int = private constant [4 x i8] c"%d\\0A\\00"  ; Format string for printing integers
                 declare i32 @printf(i8*, ...)
                 define i32 @main() {
-                
                 """;
         addCommand(command);
     }
@@ -172,6 +170,12 @@ public class CodeGenerator extends Visitor<String>{
         return printCounter;
     }
 
+    private int stringCounter = -1;
+    private int getStringCounter() {
+        stringCounter++;
+        return stringCounter;
+    }
+
     private void handlePrint(FuncCall funcCall) {
         String text = funcCall.getValues().getFirst().accept(this);
         expressionTypeEvaluator.setCurrentSymbolTable(currentSymbolTable);
@@ -192,7 +196,8 @@ public class CodeGenerator extends Visitor<String>{
             } else if (type.sameType(new BooleanType())) {
 
             } else if (type.sameType(new StringType())) {
-
+                addCommand("\n%"+temVarName+" = load i8*, i8** %"+ text);
+                addCommand("\ncall i32 (i8*, ...) @printf(i8* %"+temVarName+")");
             }
         } else {
             UnaryExpr unaryExpr = (UnaryExpr) funcCall.getValues().getFirst();
@@ -233,28 +238,6 @@ public class CodeGenerator extends Visitor<String>{
         return null;
     }
 
-//    private String getLoadCommand(VarDecSymbolTableItem varItem) {
-//        String loadCommand = "";
-//        int index = slotOf(varItem.getVarDec().getVarName());
-//        String variableName = varItem.getVarDec().getVarName();
-
-//        if (isArg) {
-//            if (varItem.getVarDec().getType() instanceof IntType || varItem.getVarDec().getType().sameType(new BooleanType()))
-//                loadCommand = "iload " + index;
-//            else
-//                loadCommand = "aload " + index;
-//        }
-//        else {
-//            loadCommand = "aload " + index;
-//            if (varItem.getVarDec().getType().sameType(new IntType())) {
-//                loadCommand += "\n%"+ variableName +" = alloca i32";
-//            } else if (varItem.getVarDec().getType().sameType(new BooleanType())) {
-//                loadCommand += "\ninvokevirtual java/lang/Boolean/booleanValue()Z";
-//            }
-//        }
-//        return loadCommand;
-//    }
-
     @Override
     public String visit(VarDec varDec) {
         String variableName = varDec.getVarName();
@@ -276,7 +259,7 @@ public class CodeGenerator extends Visitor<String>{
         return null;
     }
 
-    private Object getExprssionValue(Expr expression) {
+    private Object getExpressionValue(Expr expression) {
 
         if (expression instanceof UnaryExpr) {
             return getUnaryExpressionValue( (UnaryExpr) expression);
@@ -288,9 +271,13 @@ public class CodeGenerator extends Visitor<String>{
     private Object getUnaryExpressionValue(UnaryExpr unaryExpr) {
         Object operand = unaryExpr.getOperand();
         if (operand instanceof IntValue)
-            return ((IntValue) operand).getIntVal() + "";
+            return ((IntValue) operand).getIntVal();
         if (operand instanceof StringValue)
-            return ((StringValue) operand).getStr();
+            if (((StringValue) operand).getStr().startsWith("\"") && ((StringValue) operand).getStr().endsWith("\"")) {
+                return ((StringValue) operand).getStr().substring(1, ((StringValue) operand).getStr().length() - 1);
+            } else {
+                return ((StringValue) operand).getStr();
+            }
 
         return null;
     }
@@ -305,7 +292,7 @@ public class CodeGenerator extends Visitor<String>{
         String command = "";
         processExpression(assign.getRightHand(), assignExprByteCode);
 
-        Object rightHandValue = getExprssionValue(assign.getRightHand());
+        Object rightHandValue = getExpressionValue(assign.getRightHand());
         VarDecSymbolTableItem leftHand = getItemFromName(assign.getLeftHand());
         assert leftHand != null;
         String variableName = leftHand.getVarDec().getVarName();
@@ -313,11 +300,15 @@ public class CodeGenerator extends Visitor<String>{
         if (leftHand.getVarDec().getType().sameType(new IntType())) {
             command = "\nstore i32 "+ rightHandValue +", i32* %" + variableName;
         }
-//        if (leftHand.getVarDec().getType().sameType(new IntType()) || leftHand.getVarDec().getType().sameType(new BooleanType())) {
-//            command = "istore " + index;
-//        } else {
-//            command = "astore " + index;
-//        }
+        else if (leftHand.getVarDec().getType() instanceof StringType) {
+            int strIndex = getStringCounter();
+            int strLen = rightHandValue.toString().length() + 1;
+            addCommandAtBeginning("@.str"+ strIndex +" = private constant ["+
+                    strLen +" x i8] c\""+ rightHandValue +"\\00\"\n");
+            addCommand("\n%c_ptr"+strIndex+" = getelementptr ["+ strLen +" x i8], ["+ strLen +" x i8]* @.str"+strIndex+", i32 0, i32 0" +
+                    "\nstore i8* %c_ptr"+strIndex+", i8** %c");
+        }
+
         addCommand(command);
 
         return null;
