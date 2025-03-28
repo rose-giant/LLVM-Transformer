@@ -17,10 +17,9 @@ public class SimpleLang {
         CommonTokenStream tokens = new CommonTokenStream(simpleLangLexer);
         SimpleLangParser flParser = new SimpleLangParser(tokens);
         Program program = flParser.program().programRet;
-//
         NameAnalyzer nameAnalyzer = new NameAnalyzer();
         nameAnalyzer.visit(program);
-//
+
 //        TypeChecker typeChecker = new TypeChecker();
 //        typeChecker.visit(program);
 //

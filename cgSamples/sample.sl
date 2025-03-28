@@ -3,7 +3,9 @@ main() {
     a = 90;
     //boolean b;
     //string c;
-    //print(a);
+    //c="baby";
+    //print(c);
+    print(a);
     print(12);
     //print("Simba");
 }
