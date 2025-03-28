@@ -6,6 +6,6 @@ main() {
     c="baby";
     print(c);
     print(a);
-    //print(12);
+    print(12);
     print("Simba");
 }

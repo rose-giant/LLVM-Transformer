@@ -16,8 +16,10 @@
 		%val1 = load i32, i32* %a
 		%fmt_ptr1 = getelementptr [4 x i8], [4 x i8]* @.fmt_int, i32 0, i32 0
 		call i32 (i8*, ...) @printf(i8* %fmt_ptr1, i32 %val1)
-		%fmt_ptr3 = getelementptr [7 x i8], [7 x i8]* @.str1, i32 0, i32 0
+		%fmt_ptr2 = getelementptr [4 x i8], [4 x i8]* @.fmt_int, i32 0, i32 0
+		call i32 (i8*, ...) @printf(i8* %fmt_ptr2, i32 12)
+		%fmt_ptr4 = getelementptr [7 x i8], [7 x i8]* @.str1, i32 0, i32 0
 		
-		call i32 @puts(i8* %fmt_ptr3)
+		call i32 @puts(i8* %fmt_ptr4)
 		ret i32 0
 		}
