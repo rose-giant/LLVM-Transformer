@@ -1,11 +1,12 @@
 main() {
-    int a;
-    a = 90;
+
     boolean b;
-    string c;
-    c="baby";
-    print(c);
-    print(a);
-    print(12);
-    print("Simba");
+    b = true;
+
+    if (b)
+        print(b);
+
+    else
+        print("shit");
+
 }

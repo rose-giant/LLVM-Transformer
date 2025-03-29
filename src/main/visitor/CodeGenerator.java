@@ -26,7 +26,6 @@ import java.util.Objects;
 public class CodeGenerator extends Visitor<String>{
     private SymbolTable currentSymbolTable;
     private final ExpressionTypeEvaluator expressionTypeEvaluator = new ExpressionTypeEvaluator();
-    private final HashMap<String, Integer> slots = new HashMap<>();
 
     private final String outputPath;
     private String currentCommand = "";
@@ -166,11 +165,6 @@ public class CodeGenerator extends Visitor<String>{
         return varName + printCounter;
     }
 
-    private int getPrintCounter() {
-        printCounter++;
-        return printCounter;
-    }
-
     private int stringCounter = -1;
     private int getStringCounter() {
         stringCounter++;
@@ -181,7 +175,6 @@ public class CodeGenerator extends Visitor<String>{
         String text = funcCall.getValues().getFirst().accept(this);
         expressionTypeEvaluator.setCurrentSymbolTable(currentSymbolTable);
         Type type = funcCall.getValues().getFirst().accept(expressionTypeEvaluator);
-        processExpression(funcCall.getValues().getFirst(), text);
 
         boolean paramIsPrinted = currentSymbolTable.items.containsKey("VarDec_"+text);
 
@@ -223,24 +216,7 @@ public class CodeGenerator extends Visitor<String>{
         }
     }
 
-    private <T extends Expr> void processExpression(T genericExpression, String command) {
-//        if (genericExpression instanceof Identifier identifier) {
-//            addCommand(getLoadCommand(Objects.requireNonNull(getItemFromName(identifier.getName()))));
-//        } else if (genericExpression instanceof UnaryExpr unaryExpr && unaryExpr.getOperand() instanceof Identifier identifier) {
-//            addCommand(getLoadCommand(Objects.requireNonNull(getItemFromName(identifier.getName()))));
-//        } else {
-//            Type genericType = genericExpression.accept(expressionTypeEvaluator);
-//            addCommand(command);
-//            if (genericType.sameType(new BooleanType())) {
-//                addCommand("invokevirtual java/lang/Boolean/booleanValue()Z");
-//            }
-//        }
-    }
-
     private VarDecSymbolTableItem getItemFromName(String name) {
-        SymbolTable symbolTable = SymbolTable.top;
-
-        VarDecSymbolTableItem varDecSymbolTableItem = null;
         try {
             return (VarDecSymbolTableItem) currentSymbolTable.getItem(VarDecSymbolTableItem.START_KEY + name);
         } catch (ItemNotFoundException e) {
@@ -271,7 +247,6 @@ public class CodeGenerator extends Visitor<String>{
     }
 
     private Object getExpressionValue(Expr expression) {
-
         if (expression instanceof UnaryExpr) {
             return getUnaryExpressionValue( (UnaryExpr) expression);
         }
@@ -281,6 +256,12 @@ public class CodeGenerator extends Visitor<String>{
 
     private Object getUnaryExpressionValue(UnaryExpr unaryExpr) {
         Object operand = unaryExpr.getOperand();
+        if (Objects.equals(operand.toString(), "true")) {
+            return "true";
+        }
+        if (Objects.equals(operand.toString(), "false")) {
+            return "false";
+        }
         if (operand instanceof IntValue)
             return ((IntValue) operand).getIntVal();
         if (operand instanceof StringValue)
@@ -307,10 +288,7 @@ public class CodeGenerator extends Visitor<String>{
             assign.getRightHand().accept(this);
         }
 
-        String assignExprByteCode = assign.getRightHand().accept(this);
         String command = "";
-        processExpression(assign.getRightHand(), assignExprByteCode);
-
         Object rightHandValue = getExpressionValue(assign.getRightHand());
         VarDecSymbolTableItem leftHand = getItemFromName(assign.getLeftHand());
         assert leftHand != null;
@@ -327,16 +305,61 @@ public class CodeGenerator extends Visitor<String>{
             addCommand("\n%c_ptr"+strIndex+" = getelementptr ["+ strLen +" x i8], ["+ strLen +" x i8]* @.str"+strIndex+", i32 0, i32 0" +
                     "\nstore i8* %c_ptr"+strIndex+", i8** %c");
         }
-
+        else if (leftHand.getVarDec().getType() instanceof BooleanType) {
+            if (Objects.equals(rightHandValue.toString(), "true")) {
+                addCommand("\nstore i1 1, i1* %" + variableName);
+            } else {
+                addCommand("\nstore i1 0, i1* %" + variableName);
+            }
+        }
         addCommand(command);
 
         return null;
     }
 
+    private int booleanCounter = -1;
+    private String getNewBooleanName() {
+        booleanCounter++;
+        return "bool_" + booleanCounter;
+    }
+
     @Override
     public String visit(IfStmt ifStmt) {
         if (ifStmt.getCondition() != null) {
-            ifStmt.getCondition().accept(this);
+            if (ifStmt.getCondition() instanceof UnaryExpr) {
+                UnaryExpr condition = (UnaryExpr)ifStmt.getCondition();
+
+                String tempVarName = getNewTempVar();
+                addCommand("\n%"+tempVarName+" = load i1, i1* %"+ condition.getOperand()+"\n" +
+                        "br i1 %"+tempVarName+", label %thenBlock, label %elseBlock\n");
+
+                addCommand("\nthenBlock:\n");
+                Stmt thenStmt = ifStmt.getIfBody();
+                if (thenStmt instanceof Assign) {
+                    visit((Assign) thenStmt);
+                } else if (thenStmt instanceof VarDec) {
+                    visit((VarDec) thenStmt);
+                } else if (thenStmt instanceof FuncCall) {
+                    visit((FuncCall) thenStmt);
+                } else if (thenStmt instanceof IfStmt) {
+                    visit((IfStmt) thenStmt);
+                }
+                addCommand("\nbr label %endIf\n");
+
+                addCommand("\nelseBlock:\n");
+                Stmt elseStmt = ifStmt.getElseBody();
+                if (elseStmt instanceof Assign) {
+                    visit((Assign) elseStmt);
+                } else if (elseStmt instanceof VarDec) {
+                    visit((VarDec) elseStmt);
+                } else if (elseStmt instanceof FuncCall) {
+                    visit((FuncCall) elseStmt);
+                } else if (elseStmt instanceof IfStmt) {
+                    visit((IfStmt) elseStmt);
+                }
+                addCommand("\nbr label %endIf\n");
+                addCommand("\nendIf:\n");
+            }
         }
 
         return null;
