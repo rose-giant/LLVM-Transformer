@@ -24,12 +24,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Objects;
 
+import static java.util.Objects.isNull;
+
 public class CodeGenerator extends Visitor<String>{
     private SymbolTable currentSymbolTable;
     private final ExpressionTypeEvaluator expressionTypeEvaluator = new ExpressionTypeEvaluator();
 
     private final String outputPath;
     private String currentCommand = "";
+    private FuncDec currentFuncDec;
 
     private FileWriter mainFile;
     public CodeGenerator() {
@@ -110,14 +113,14 @@ public class CodeGenerator extends Visitor<String>{
     public String visit(Program program) {
         handleMainClass();
 
+        if (program.getMain() != null) {
+            program.getMain().accept(this);
+        }
+
         for (FuncDec funcDec : program.getFuncDecs()) {
             if (funcDec != null) {
                 funcDec.accept(this);
             }
-        }
-
-        if (program.getMain() != null) {
-            program.getMain().accept(this);
         }
 
         finishMainClass();
@@ -133,6 +136,7 @@ public class CodeGenerator extends Visitor<String>{
 
     @Override
     public String visit(FuncDec funcDec) {
+        currentFuncDec = funcDec;
         ArrayList<VarDec> args = funcDec.getArgs();
         addFuncDecCommand("\ndefine void @" + funcDec.getFuncName()+"(");
         for (int i = 0; i < args.size(); i++) {
@@ -141,10 +145,12 @@ public class CodeGenerator extends Visitor<String>{
         addFuncDecCommand(") {\n" + "entry:");
 
         for (Stmt stmt : funcDec.getStmts()) {
-            //handleStatementVisitors(stmt);
+            stmt.accept(this);
+            addFuncDecCommand(handleStatementVisitors(stmt));
         }
-        addFuncDecCommand("\n}");
 
+        addFuncDecCommand("\nret void;\n}\n");
+        currentFuncDec = null;
         return null;
     }
 
@@ -153,14 +159,20 @@ public class CodeGenerator extends Visitor<String>{
         currentSymbolTable = main.getMainSymbolTable();
         for (var statement : main.getStmts()) {
             statement.accept(this);
+            addCommand(handleStatementVisitors(statement));
         }
         return null;
     }
 
     @Override
     public String visit(FuncCall funcCall) {
-        if(Objects.equals(funcCall.getFunctionName(), "print")) handlePrint(funcCall);
-        return null;
+        String command = "";
+        if(Objects.equals(funcCall.getFunctionName(), "print"))
+            command = handlePrint(funcCall);
+        else {
+            command = "\ncall void @"+ funcCall.getFunctionName() +"()\n";
+        }
+        return command;
     }
 
     private int tempVariableCounter = -1;
@@ -183,50 +195,14 @@ public class CodeGenerator extends Visitor<String>{
         return stringCounter;
     }
 
-    private void handlePrint(FuncCall funcCall) {
-        String text = funcCall.getValues().getFirst().accept(this);
-        expressionTypeEvaluator.setCurrentSymbolTable(currentSymbolTable);
-        Type type = funcCall.getValues().getFirst().accept(expressionTypeEvaluator);
-
-        boolean paramIsPrinted = currentSymbolTable.items.containsKey("VarDec_"+text);
-
-        if (paramIsPrinted) {
-            String temVarName = getNewTempVar();
-            String fmtPointerName = getNewPrintName();
-
-            if (type.sameType(new IntType())) {
-                addCommand("\n%"+ temVarName +" = load i32, i32* %" + text +
-                        "\n%" + fmtPointerName + " = getelementptr [4 x i8], [4 x i8]* @.fmt_int, i32 0, i32 0" +
-                        "\ncall i32 (i8*, ...) @printf(i8* %"+ fmtPointerName +", i32 %"+ temVarName +")");
-            }
-            else if (type.sameType(new BooleanType())) {
-
-            }
-            else if (type.sameType(new StringType())) {
-                addCommand("\n%"+temVarName+" = load i8*, i8** %"+ text);
-                addCommand("\ncall i32 (i8*, ...) @printf(i8* %"+temVarName+")");
-            }
+    private VarDecSymbolTableItem getFunctionLocalItemFromName(FuncDec funcDec, String name) {
+        try {
+            return (VarDecSymbolTableItem) funcDec.getFunctionSymbolTable()
+                    .getItem(VarDecSymbolTableItem.START_KEY + name);
+        } catch (ItemNotFoundException e) {
         }
-        else {
-            UnaryExpr unaryExpr = (UnaryExpr) funcCall.getValues().getFirst();
-            String argValue = unaryExpr.getOperand().toString();
-            String fmtPointerName = getNewPrintName();
 
-            if (type instanceof IntType) {
-                addCommand("\n%"+fmtPointerName + " = getelementptr [4 x i8], [4 x i8]* @.fmt_int, i32 0, i32 0" +
-                        "\ncall i32 (i8*, ...) @printf(i8* %"+ fmtPointerName +", i32 "+ argValue +")");
-            }
-            else if (type instanceof StringType) {
-                String strLiteral = removeExtraQuotations(argValue);
-                String strName = "str"+getStringCounter();
-                int strLen = strLiteral.length()+2;
-                String printPointerName = getNewPrintName();
-
-                addCommandAtBeginning("@."+ strName +" = private constant ["+ strLen +" x i8] c\""+strLiteral+"\\0A\\00\"\n");
-                addCommand("\n%"+printPointerName+" = getelementptr ["+strLen+" x i8], ["+strLen+" x i8]* @."+strName+", i32 0, i32 0\n" +
-                        "\ncall i32 @puts(i8* %"+printPointerName+")");
-            }
-        }
+        return null;
     }
 
     private VarDecSymbolTableItem getItemFromName(String name) {
@@ -235,27 +211,6 @@ public class CodeGenerator extends Visitor<String>{
         } catch (ItemNotFoundException e) {
         }
 
-        return null;
-    }
-
-    @Override
-    public String visit(VarDec varDec) {
-        String variableName = varDec.getVarName();
-        String command = "\n%"+ variableName +" = alloca ";
-
-        if (varDec.getType() instanceof IntType) {
-            command = command + "i32";
-        }
-
-        if (varDec.getType() instanceof BooleanType) {
-            command = command + "i1";
-        }
-
-        if (varDec.getType() instanceof StringType) {
-            command = command + "i8*";
-        }
-
-        addCommand(command);
         return null;
     }
 
@@ -295,6 +250,86 @@ public class CodeGenerator extends Visitor<String>{
         }
     }
 
+    private String handlePrint(FuncCall funcCall) {
+        String text = funcCall.getValues().getFirst().accept(this);
+        expressionTypeEvaluator.setCurrentSymbolTable(currentSymbolTable);
+        Type type = funcCall.getValues().getFirst().accept(expressionTypeEvaluator);
+        boolean paramIsPrinted = currentSymbolTable.items.containsKey("VarDec_"+text);
+        String command = "";
+
+        if (paramIsPrinted) {
+            String temVarName = getNewTempVar();
+            String fmtPointerName = getNewPrintName();
+
+            if (type.sameType(new IntType())) {
+                command = command.concat("\n%"+ temVarName +" = load i32, i32* %" + text +
+                        "\n%" + fmtPointerName + " = getelementptr [4 x i8], [4 x i8]* @.fmt_int, i32 0, i32 0" +
+                        "\ncall i32 (i8*, ...) @printf(i8* %"+ fmtPointerName +", i32 %"+ temVarName +")");
+//                addCommand("\n%"+ temVarName +" = load i32, i32* %" + text +
+//                        "\n%" + fmtPointerName + " = getelementptr [4 x i8], [4 x i8]* @.fmt_int, i32 0, i32 0" +
+//                        "\ncall i32 (i8*, ...) @printf(i8* %"+ fmtPointerName +", i32 %"+ temVarName +")");
+            }
+            else if (type.sameType(new BooleanType())) {
+
+            }
+            else if (type.sameType(new StringType())) {
+                command = command.concat("\n%"+temVarName+" = load i8*, i8** %"+ text +
+                        "\ncall i32 (i8*, ...) @printf(i8* %"+temVarName+")");
+//                addCommand("\n%"+temVarName+" = load i8*, i8** %"+ text);
+//                addCommand("\ncall i32 (i8*, ...) @printf(i8* %"+temVarName+")");
+            }
+        }
+        else {
+            UnaryExpr unaryExpr = (UnaryExpr) funcCall.getValues().getFirst();
+            String argValue = unaryExpr.getOperand().toString();
+            String fmtPointerName = getNewPrintName();
+
+            if (type instanceof IntType) {
+                command = command.concat("\n%"+fmtPointerName + " = getelementptr [4 x i8], [4 x i8]* @.fmt_int, i32 0, i32 0" +
+                        "\ncall i32 (i8*, ...) @printf(i8* %"+ fmtPointerName +", i32 "+ argValue +")");
+//                addCommand("\n%"+fmtPointerName + " = getelementptr [4 x i8], [4 x i8]* @.fmt_int, i32 0, i32 0" +
+//                        "\ncall i32 (i8*, ...) @printf(i8* %"+ fmtPointerName +", i32 "+ argValue +")");
+            }
+            else if (type instanceof StringType) {
+                String strLiteral = removeExtraQuotations(argValue);
+                String strName = "str"+getStringCounter();
+                int strLen = strLiteral.length()+2;
+                String printPointerName = getNewPrintName();
+
+                addCommandAtBeginning("@."+ strName +" = private constant ["+ strLen +" x i8] c\""+strLiteral+"\\0A\\00\"\n");
+                command = command.concat("\n%"+printPointerName+
+                        " = getelementptr ["+strLen+" x i8], ["+strLen+" x i8]* @."+strName+", i32 0, i32 0\n" +
+                        "\ncall i32 @puts(i8* %"+printPointerName+")");
+//                addCommand("\n%"+printPointerName+" = getelementptr ["+strLen+" x i8], ["+strLen+" x i8]* @."+strName+", i32 0, i32 0\n" +
+//                        "\ncall i32 @puts(i8* %"+printPointerName+")");
+            }
+        }
+
+        return command;
+    }
+
+    @Override
+    public String visit(VarDec varDec) {
+        String variableName = varDec.getVarName();
+        String command = "\n%"+ variableName +" = alloca ";
+
+        if (varDec.getType() instanceof IntType) {
+            command = command + "i32";
+        }
+
+        if (varDec.getType() instanceof BooleanType) {
+            command = command + "i1";
+        }
+
+        if (varDec.getType() instanceof StringType) {
+            command = command + "i8*";
+        }
+
+//        if (isNull(currentFuncDec)) addCommand(command);
+
+        return command;
+    }
+
     @Override
     public String visit(Assign assign) {
         if ( assign.getRightHand() != null ) {
@@ -303,7 +338,10 @@ public class CodeGenerator extends Visitor<String>{
 
         String command = "";
         Object rightHandValue = getExpressionValue(assign.getRightHand());
-        VarDecSymbolTableItem leftHand = getItemFromName(assign.getLeftHand());
+        VarDecSymbolTableItem leftHand;
+        if (isNull(currentFuncDec)) leftHand = getItemFromName(assign.getLeftHand());
+        else leftHand = getFunctionLocalItemFromName(currentFuncDec, assign.getLeftHand());
+
         assert leftHand != null;
         String variableName = leftHand.getVarDec().getVarName();
 
@@ -315,64 +353,71 @@ public class CodeGenerator extends Visitor<String>{
             int strLen = rightHandValue.toString().length() + 1;
             addCommandAtBeginning("@.str"+ strIndex +" = private constant ["+
                     strLen +" x i8] c\""+ rightHandValue +"\\00\"\n");
-            addCommand("\n%c_ptr"+strIndex+" = getelementptr ["+ strLen +" x i8], ["+ strLen +" x i8]* @.str"+strIndex+", i32 0, i32 0" +
-                    "\nstore i8* %c_ptr"+strIndex+", i8** %c");
+            command = "\n%c_ptr"+strIndex+" = getelementptr ["+ strLen +" x i8], ["+ strLen +" x i8]* @.str"+strIndex+", i32 0, i32 0" +
+                    "\nstore i8* %c_ptr"+strIndex+", i8** %c";
+//            addCommand(command);
         }
         else if (leftHand.getVarDec().getType() instanceof BooleanType) {
             if (Objects.equals(rightHandValue.toString(), "true")) {
-                addCommand("\nstore i1 1, i1* %" + variableName);
+                command = "\nstore i1 1, i1* %" + variableName;
+//                addCommand(command);
             } else {
-                addCommand("\nstore i1 0, i1* %" + variableName);
+                command = "\nstore i1 0, i1* %" + variableName;
+//                addCommand(command);
             }
         }
-        addCommand(command);
+        //addCommand(command);
 
-        return null;
-    }
-
-    private int booleanCounter = -1;
-    private String getNewBooleanName() {
-        booleanCounter++;
-        return "bool_" + booleanCounter;
+//        if (isNull(currentFuncDec)) addCommand(command);
+        return command;
     }
 
     @Override
     public String visit(IfStmt ifStmt) {
+        String command = "";
         if (ifStmt.getCondition() != null) {
             if (ifStmt.getCondition() instanceof UnaryExpr) {
                 UnaryExpr condition = (UnaryExpr)ifStmt.getCondition();
 
                 String tempVarName = getNewTempVar();
-                addCommand("\n%"+tempVarName+" = load i1, i1* %"+ condition.getOperand()+"\n" +
+                command = command.concat("\n%"+tempVarName+" = load i1, i1* %"+ condition.getOperand()+"\n" +
                         "br i1 %"+tempVarName+", label %thenBlock, label %elseBlock\n");
 
-                addCommand("\nthenBlock:\n");
+                command = command.concat("\nthenBlock:\n");
                 Stmt thenStmt = ifStmt.getIfBody();
-                handleStatementVisitors(thenStmt);
-                addCommand("\nbr label %endIf\n");
+                command = command.concat(handleStatementVisitors(thenStmt));
+                command = command.concat("\nbr label %endIf\n");
 
-                addCommand("\nelseBlock:\n");
+                command = command.concat("\nelseBlock:\n");
                 Stmt elseStmt = ifStmt.getElseBody();
-                handleStatementVisitors(elseStmt);
-                addCommand("\nbr label %endIf\n");
+                command = command.concat(handleStatementVisitors(elseStmt));
 
-                addCommand("\nendIf:\n");
+                command = command.concat("\nbr label %endIf\nendIf:\n");
             }
         }
 
-        return null;
+//        if (isNull(currentFuncDec)) addCommand(command);
+//        else addFuncDecCommand(command);
+
+        return command;
     }
 
-    private void handleStatementVisitors(Stmt stmt) {
+    private String handleStatementVisitors(Stmt stmt) {
+        String command = "";
         if (stmt instanceof Assign) {
-            visit((Assign) stmt);
+            command = visit((Assign) stmt);
         } else if (stmt instanceof VarDec) {
-            visit((VarDec) stmt);
+            command = visit((VarDec) stmt);
         } else if (stmt instanceof FuncCall) {
-            visit((FuncCall) stmt);
+            command = visit((FuncCall) stmt);
         } else if (stmt instanceof IfStmt) {
-            visit((IfStmt) stmt);
+            command = visit((IfStmt) stmt);
         }
+
+//        if (isNull(currentFuncDec)) addCommand(command);
+//        else addFuncDecCommand(command);
+
+        return command;
     }
 
     @Override

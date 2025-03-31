@@ -1,13 +1,21 @@
 FuncDec foo() {
     int x;          // Declare an integer variable x
     x = 3;          // Assign value 3 to x
-    print(x);
+    boolean a;
+    a = true;
+
+    if (a)
+        print("bitch1");
+    else
+        print("bitch2");
+
+    //print(x);
 }
 
 main() {
+    foo();
     boolean b;
     b = true;
-    foo();
 
     if (b)
         print("hi1");

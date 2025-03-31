@@ -34,10 +34,6 @@ public class Main extends Node {
         return stmts;
     }
 
-    public void setStmts(ArrayList<Stmt> stmts) {
-        this.stmts = stmts;
-    }
-
     public void setSymbolTable(SymbolTable mainSymbolTable) {
         this.mainSymbolTable = mainSymbolTable;
     }
