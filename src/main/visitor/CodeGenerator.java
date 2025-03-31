@@ -20,6 +20,7 @@ import main.symbolTable.exceptions.ItemNotFoundException;
 import main.symbolTable.item.VarDecSymbolTableItem;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Objects;
 
@@ -102,6 +103,7 @@ public class CodeGenerator extends Visitor<String>{
             }
             """;
         addCommand(command);
+        addCommand(funcDecCommand);
     }
 
     @Override
@@ -124,13 +126,24 @@ public class CodeGenerator extends Visitor<String>{
         return null;
     }
 
+    String funcDecCommand = "";
+    private void addFuncDecCommand(String newCommand) {
+        funcDecCommand = funcDecCommand.concat(newCommand);
+    }
+
     @Override
     public String visit(FuncDec funcDec) {
-        for (Stmt stmt : funcDec.getStmts()) {
-            if (stmt != null) {
-                stmt.accept(this);
-            }
+        ArrayList<VarDec> args = funcDec.getArgs();
+        addFuncDecCommand("\ndefine void @" + funcDec.getFuncName()+"(");
+        for (int i = 0; i < args.size(); i++) {
+            visit(args.get(i));
         }
+        addFuncDecCommand(") {\n" + "entry:");
+
+        for (Stmt stmt : funcDec.getStmts()) {
+            //handleStatementVisitors(stmt);
+        }
+        addFuncDecCommand("\n}");
 
         return null;
     }
@@ -147,7 +160,6 @@ public class CodeGenerator extends Visitor<String>{
     @Override
     public String visit(FuncCall funcCall) {
         if(Objects.equals(funcCall.getFunctionName(), "print")) handlePrint(funcCall);
-
         return null;
     }
 
@@ -186,10 +198,11 @@ public class CodeGenerator extends Visitor<String>{
                 addCommand("\n%"+ temVarName +" = load i32, i32* %" + text +
                         "\n%" + fmtPointerName + " = getelementptr [4 x i8], [4 x i8]* @.fmt_int, i32 0, i32 0" +
                         "\ncall i32 (i8*, ...) @printf(i8* %"+ fmtPointerName +", i32 %"+ temVarName +")");
+            }
+            else if (type.sameType(new BooleanType())) {
 
-            } else if (type.sameType(new BooleanType())) {
-
-            } else if (type.sameType(new StringType())) {
+            }
+            else if (type.sameType(new StringType())) {
                 addCommand("\n%"+temVarName+" = load i8*, i8** %"+ text);
                 addCommand("\ncall i32 (i8*, ...) @printf(i8* %"+temVarName+")");
             }
@@ -202,12 +215,12 @@ public class CodeGenerator extends Visitor<String>{
             if (type instanceof IntType) {
                 addCommand("\n%"+fmtPointerName + " = getelementptr [4 x i8], [4 x i8]* @.fmt_int, i32 0, i32 0" +
                         "\ncall i32 (i8*, ...) @printf(i8* %"+ fmtPointerName +", i32 "+ argValue +")");
-            } else if (type instanceof StringType) {
+            }
+            else if (type instanceof StringType) {
                 String strLiteral = removeExtraQuotations(argValue);
                 String strName = "str"+getStringCounter();
                 int strLen = strLiteral.length()+2;
                 String printPointerName = getNewPrintName();
-
 
                 addCommandAtBeginning("@."+ strName +" = private constant ["+ strLen +" x i8] c\""+strLiteral+"\\0A\\00\"\n");
                 addCommand("\n%"+printPointerName+" = getelementptr ["+strLen+" x i8], ["+strLen+" x i8]* @."+strName+", i32 0, i32 0\n" +
@@ -335,34 +348,31 @@ public class CodeGenerator extends Visitor<String>{
 
                 addCommand("\nthenBlock:\n");
                 Stmt thenStmt = ifStmt.getIfBody();
-                if (thenStmt instanceof Assign) {
-                    visit((Assign) thenStmt);
-                } else if (thenStmt instanceof VarDec) {
-                    visit((VarDec) thenStmt);
-                } else if (thenStmt instanceof FuncCall) {
-                    visit((FuncCall) thenStmt);
-                } else if (thenStmt instanceof IfStmt) {
-                    visit((IfStmt) thenStmt);
-                }
+                handleStatementVisitors(thenStmt);
                 addCommand("\nbr label %endIf\n");
 
                 addCommand("\nelseBlock:\n");
                 Stmt elseStmt = ifStmt.getElseBody();
-                if (elseStmt instanceof Assign) {
-                    visit((Assign) elseStmt);
-                } else if (elseStmt instanceof VarDec) {
-                    visit((VarDec) elseStmt);
-                } else if (elseStmt instanceof FuncCall) {
-                    visit((FuncCall) elseStmt);
-                } else if (elseStmt instanceof IfStmt) {
-                    visit((IfStmt) elseStmt);
-                }
+                handleStatementVisitors(elseStmt);
                 addCommand("\nbr label %endIf\n");
+
                 addCommand("\nendIf:\n");
             }
         }
 
         return null;
+    }
+
+    private void handleStatementVisitors(Stmt stmt) {
+        if (stmt instanceof Assign) {
+            visit((Assign) stmt);
+        } else if (stmt instanceof VarDec) {
+            visit((VarDec) stmt);
+        } else if (stmt instanceof FuncCall) {
+            visit((FuncCall) stmt);
+        } else if (stmt instanceof IfStmt) {
+            visit((IfStmt) stmt);
+        }
     }
 
     @Override
