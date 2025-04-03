@@ -6,7 +6,6 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import parsers.SimpleLangLexer;
 import parsers.SimpleLangParser;
-
 import java.io.*;
 
 public class SimpleLang {

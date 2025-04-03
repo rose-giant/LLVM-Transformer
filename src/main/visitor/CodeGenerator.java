@@ -92,7 +92,7 @@ public class CodeGenerator extends Visitor<String>{
 
     private void handleMainClass(){
         String command = """
-                @.fmt_int = private constant [4 x i8] c"%d\\0A\\00"  ; Format string for printing integers
+                @.fmt_int = private constant [4 x i8] c"%d\\0A\\00"
                 declare i32 @printf(i8*, ...)
                 declare i32 @puts(i8*)
                 define i32 @main() {
@@ -140,7 +140,9 @@ public class CodeGenerator extends Visitor<String>{
         ArrayList<VarDec> args = funcDec.getArgs();
         addFuncDecCommand("\ndefine void @" + funcDec.getFuncName()+"(");
         for (int i = 0; i < args.size(); i++) {
-            visit(args.get(i));
+            addFuncDecCommand(i != 0 ? ", " : "");
+            addFuncDecCommand(returnLLVMType(args.get(i)) +
+                    " %" + args.get(i).getVarName());
         }
         addFuncDecCommand(") {\n" + "entry:");
 
@@ -170,9 +172,39 @@ public class CodeGenerator extends Visitor<String>{
         if(Objects.equals(funcCall.getFunctionName(), "print"))
             command = handlePrint(funcCall);
         else {
-            command = "\ncall void @"+ funcCall.getFunctionName() +"()\n";
+            ArrayList <String> argValues = new ArrayList<>();
+            String args = "";
+
+            //here
+            for (int i = 0; i < funcCall.values.size(); i++) {
+                if (funcCall.values.get(i) instanceof UnaryExpr) {
+                    String type = getUnaryExpressionLLVMType( (UnaryExpr) funcCall.values.get(i));
+                    args = args.concat(type + " " + ((UnaryExpr) funcCall.values.get(i)).getOperand());
+                }
+                //args = args.concat(strArgVal);
+                args = i==funcCall.values.size()-1 ? args : args.concat(",");
+            }
+
+            command = "\ncall void @"+ funcCall.getFunctionName() +"(" +
+                    args + ")\n";
         }
         return command;
+    }
+
+    private String getUnaryExpressionLLVMType(UnaryExpr unaryExpr) {
+        if (unaryExpr.getOperand().getType() instanceof IntType) {
+            return "i32";
+        }
+
+        else if (unaryExpr.getOperand().getType() instanceof BooleanType) {
+            return "i1";
+        }
+
+        else if (unaryExpr.getOperand().getType() instanceof StringType) {
+            return "i8*";
+        }
+
+        return "";
     }
 
     private int tempVariableCounter = -1;
@@ -308,11 +340,8 @@ public class CodeGenerator extends Visitor<String>{
         return command;
     }
 
-    @Override
-    public String visit(VarDec varDec) {
-        String variableName = varDec.getVarName();
-        String command = "\n%"+ variableName +" = alloca ";
-
+    private  String returnLLVMType(VarDec varDec) {
+        String command = "";
         if (varDec.getType() instanceof IntType) {
             command = command + "i32";
         }
@@ -324,6 +353,27 @@ public class CodeGenerator extends Visitor<String>{
         if (varDec.getType() instanceof StringType) {
             command = command + "i8*";
         }
+
+        return command;
+    }
+
+    @Override
+    public String visit(VarDec varDec) {
+        String variableName = varDec.getVarName();
+        String command = "\n%"+ variableName +" = alloca ";
+
+        command = command + returnLLVMType(varDec);
+//        if (varDec.getType() instanceof IntType) {
+//            command = command + "i32";
+//        }
+//
+//        if (varDec.getType() instanceof BooleanType) {
+//            command = command + "i1";
+//        }
+//
+//        if (varDec.getType() instanceof StringType) {
+//            command = command + "i8*";
+//        }
 
 //        if (isNull(currentFuncDec)) addCommand(command);
 

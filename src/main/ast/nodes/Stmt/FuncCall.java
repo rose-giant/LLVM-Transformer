@@ -8,10 +8,10 @@ import java.util.ArrayList;
 
 public class FuncCall extends Stmt{
     private String functionName;
-    private ArrayList<Expr> values = new ArrayList<>();
+    public ArrayList<Expr> values = new ArrayList<>();
 
     public ArrayList<Expr> getValues() {
-        return values;
+        return this.values;
     }
 
     public void setValues(ArrayList<Expr> values) {

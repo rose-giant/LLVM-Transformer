@@ -1,6 +1,6 @@
-FuncDec foo() {
-    int x;          // Declare an integer variable x
-    x = 3;          // Assign value 3 to x
+FuncDec foo(int x, boolean z) {
+    //int x;          // Declare an integer variable x
+    //x = 3;          // Assign value 3 to x
     boolean a;
     a = true;
 
@@ -9,11 +9,11 @@ FuncDec foo() {
     else
         print("bitch2");
 
-    //print(x);
+    print(2);
 }
 
 main() {
-    foo();
+    foo(1, false);
     boolean b;
     b = true;
 
