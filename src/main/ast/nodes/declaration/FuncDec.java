@@ -4,13 +4,24 @@ import main.ast.nodes.Node;
 import main.ast.nodes.Stmt.Stmt;
 import main.ast.nodes.Stmt.VarDec;
 import main.symbolTable.SymbolTable;
+import main.symbolTable.item.VarDecSymbolTableItem;
 import main.visitor.IVisitor;
 
 import java.util.ArrayList;
 
+import static java.util.Objects.isNull;
+
 public class FuncDec extends Node {
     private String funcName;
+    private VarDecSymbolTableItem varDecSymbolTableItem;
 
+    public void setVarDecSymbolTableItem(VarDec varDec) {
+        if (isNull(varDecSymbolTableItem)) varDecSymbolTableItem = new VarDecSymbolTableItem(varDec);
+
+        else varDecSymbolTableItem.setVarDec(varDec);
+
+//        functionSymbolTable
+    }
     public SymbolTable getFunctionSymbolTable() {
         return functionSymbolTable;
     }
